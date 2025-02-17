@@ -12,10 +12,10 @@ Ce projet propose une passerelle USB permettant d'interfacer un chauffe-eau TFlo
   Elle gere la partie wifi, le protocole MQTT et le decodage des trames reçues par la carte STM32
 
 ## Schéma
-![Schéma](Hardware/schéma.pdf)
+![Schéma](Hardware/Schéma.pdf)
   
 ## PCB
-![PCB](Hardware/pcb.jpg)
+![Pcb](Hardware/Pcb.jpg)
 
 # Software
 
