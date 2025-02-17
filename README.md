@@ -15,7 +15,7 @@ Ce projet propose une passerelle USB permettant d'interfacer un chauffe-eau TFlo
   A venir
   
 ## PCB
-  A venir
+![Alt text](pcb.jpg)
 
 # Software
 
