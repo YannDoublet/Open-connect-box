@@ -19,7 +19,7 @@ Ce projet propose une passerelle USB permettant d'interfacer un chauffe-eau TFlo
 
 # Software
 
-## la carte BLACKPILL (STM32)
+## la carte BLACKPILL (STM32F401)
   Elle est programmée en C, via l'IDE de chez ST microlectronics
 
 ## la carte Raspberry pico W
