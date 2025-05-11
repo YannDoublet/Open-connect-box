@@ -13,7 +13,7 @@ Avant de commencer, assurez-vous d'avoir les éléments suivants :
 - Un Raspberry Pi Pico W.
 - Un câble micro-USB.
 - Un ordinateur (Windows, macOS ou Linux).
-- Le fichier firmware MicroPython (par exemple, `pico-w-micropython.uf2`) disponible dans le dossier.
+- Le fichier firmware MicroPython (par exemple, `RPI_PICO_W-20250415-v1.25.0.uf2`) disponible dans le dossier.
 - Un éditeur de code ou un IDE supportant MicroPython (comme [Thonny](https://thonny.org/)).
 
 ---
@@ -22,13 +22,13 @@ Avant de commencer, assurez-vous d'avoir les éléments suivants :
 
 ### 1. Téléchargez le Firmware
 
-1. Téléchargez le fichier firmware MicroPython `pico-w-micropython.uf2`.
+1. Téléchargez le fichier firmware MicroPython `RPI_PICO_W-20250415-v1.25.0.uf2`.
 
 ### 2. Installez le Firmware sur le Pico W
 
 1. Connectez le Raspberry Pi Pico W à votre ordinateur tout en maintenant le bouton **BOOTSEL** enfoncé.
 2. Une fois connecté, le Pico W apparaîtra comme un périphérique de stockage USB nommé `RPI-RP2`.
-3. Glissez-déposez le fichier `pico-w-micropython.uf2` téléchargé dans le répertoire `RPI-RP2`.
+3. Glissez-déposez le fichier `RPI_PICO_W-20250415-v1.25.0.uf2` téléchargé dans le répertoire `RPI-RP2`.
 4. Après la copie, le Pico W redémarrera automatiquement avec MicroPython installé.
 
 ---
