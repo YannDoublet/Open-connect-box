@@ -48,9 +48,3 @@ Ce répertoire contient les ressources matérielles associées au projet **Open-
 - [Dépôt GitHub du projet Open-connect-box](https://github.com/YannDoublet/Open-connect-box)
 
 ---
-
-Si vous avez besoin d'aide supplémentaire pour utiliser ces fichiers ou si vous rencontrez des problèmes, n'hésitez pas à créer une issue dans ce dépôt.
-
---- 
-
-Vous pouvez sauvegarder ce contenu dans un fichier `README.md` dans le répertoire `Hardware` de votre dépôt. Si vous souhaitez des ajouts ou des modifications spécifiques, faites-le-moi savoir !
