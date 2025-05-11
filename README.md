@@ -58,7 +58,7 @@ Chaque commande doit être une chaîne JSON, par exemple :
 ```
 
 #### Commandes supportées
-
+```
 | Type de commande | Exemple de payload JSON                                 | Effet                                      |
 |------------------|--------------------------------------------------------|--------------------------------------------|
 | auto             | `{"type": "auto"}`                                     | Passe en mode automatique                  |
@@ -66,7 +66,7 @@ Chaque commande doit être une chaîne JSON, par exemple :
 | confort          | `{"type": "confort", "params": {"duration": 2}}`       | Mode confort pour X jours (défaut : 2)     |
 | vacances         | `{"type": "vacances", "params": {"duration": 10}}`     | Mode vacances pour X jours (défaut : 10)   |
 | temp             | `{"type": "temp", "params": {"temperature": 20.5}}`    | Définit la température cible (en °C)       |
-
+```
 > **Remarque :**  
 > Les paramètres (`params`) sont optionnels selon la commande.  
 > Le format exact et les effets dépendent de l’implémentation dans `ualdes.py`.
