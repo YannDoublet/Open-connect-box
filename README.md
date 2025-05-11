@@ -14,13 +14,16 @@ Ce projet propose une passerelle USB permettant d'interfacer un chauffe-eau TFlo
 ### 2. Carte Raspberry Pi Pico W
 - Gère la connexion WiFi, le protocole MQTT et le décodage des trames reçues de la carte STM32.
 
+### 3. Boitier
+- Boitier référence 1551WTFLBK de chez HAMMOND pour intégrer le pcb,la carte STM32 et la Pico W
+
 ---
 
 ## Schéma & PCB
 
-- **Schéma** : ![Schéma électronique](Hardware/schéma.png)
-- **PCB** : ![PCB](Hardware/pcb.png)
-- **Boitier** : ![Boitier](Hardware/boitier.pdf)
+- **Schéma** : ![Schéma électronique](Hardware/Schéma.pdf)
+- **PCB** : ![PCB](Hardware/Pcb.jpg)
+- **Boitier** : ![Boitier](Hardware/1551WTFLBK.pdf)
 
 ---
 
