@@ -7,11 +7,11 @@ Ce projet propose une passerelle USB permettant d'interfacer un chauffe-eau TFlo
 
 ## Hardware
 
-### 1. Carte BLACKPILL (STM32)
+### 1. Carte BLACKPILL (STM32F411CEU6 de chez WeAct Studio)
 - Convertit les trames reçues/envoyées au chauffe-eau.
 - Transfère les données via UART à la carte Raspberry Pi Pico W.
 
-### 2. Carte Raspberry Pi Pico W
+### 2. Carte officielle Raspberry Pi Pico W
 - Gère la connexion WiFi, le protocole MQTT et le décodage des trames reçues de la carte STM32.
 
 ### 3. Boitier
