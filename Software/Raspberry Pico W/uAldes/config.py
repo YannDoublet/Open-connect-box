@@ -11,7 +11,7 @@ WIFI_NETWORKS ={
 MQTT_CONFIG = {
     "broker": "mqtt.broker.address",
     "port": 1883,
-    "client_id": "uart_usb_device",
+    "client_id": "aldes",
     "user": "mqtt_username",
     "password": "mqtt_password",
     "ssl": False,
@@ -20,9 +20,8 @@ MQTT_CONFIG = {
 
 # MQTT Topics
 MQTT_TOPICS = {
-    "publish": "uart_usb/data",
-    "subscribe": "uart_usb/commands",
-    "status": "uart_usb/status"
+    "main": "aldes/",
+    "command": "aldes/commands",
 }
 
 UALDES_OPTIONS = {  
