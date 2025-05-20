@@ -125,6 +125,20 @@ ping_interval = 30  # Ping toutes les 30 secondes
 
 
 while True:
+  # Vérification périodique de la connexion Wi-Fi
+  if not wlan.isconnected():
+    print("Wi-Fi déconnecté. Tentative de reconnexion...")
+    wlan.connect(WIFI_NETWORKS["ssid"], WIFI_NETWORKS["password"])
+    for i in range(10):
+      if wlan.isconnected():
+        print("Reconnexion Wi-Fi réussie.")
+        break
+      print("Attente reconnexion Wi-Fi...")
+      utime.sleep(1)
+    if not wlan.isconnected():
+      print("Impossible de se reconnecter au Wi-Fi. Redémarrage...")
+      reset()
+
   try:
     client.check_msg()
     uart_data = uart.read()
