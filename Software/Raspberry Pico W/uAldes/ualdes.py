@@ -37,15 +37,18 @@ Version: 1.0.0
 """
 
 ITEMS_MAPPING = {
-    "Soft": {"Index": 4, "Type": 0, "Publish": False},
+    "Soft": {"Index": 4, "Type": 0, "Publish": True},
     "Etat": {"Index": 6, "Type": 0, "Publish": True},
-    "Cond_C": {"Index": 28, "Type": 1, "Publish": False},
-    "Cond_R": {"Index": 29, "Type": 1, "Publish": False},
-    "T_haut": {"Index": 36, "Type": 2, "Publish": False},
-    "T_bas": {"Index": 37, "Type": 2, "Publish": False},
-    "T_hp": {"Index": 32, "Type": 2, "Publish": False},
-    "T_evap": {"Index": 34, "Type": 2, "Publish": False},
+    "Comp_C": {"Index": 28, "Type": 1, "Publish": True},
+    "Comp_R": {"Index": 29, "Type": 1, "Publish": True},
+    "T_hp": {"Index": 32, "Type": 2, "Publish": True},
     "T_vmc": {"Index": 33, "Type": 2, "Publish": True},
+    "T_evap": {"Index": 34, "Type": 2, "Publish": True},
+    "T_haut": {"Index": 36, "Type": 2, "Publish": True},
+    "T_bas": {"Index": 37, "Type": 2, "Publish": True},
+    "DP": {"Index": 38, "Type": 0, "Publish": True},
+    "Ventil_flow": {"Index": 39, "Type": 4, "Publish": True},
+    "Ventil_rpm": {"Index": 40, "Type": 3, "Publish": True},
 }
 
 def aldes_checksum(data):
@@ -197,6 +200,10 @@ def decode_value(value,type):
         return value / 2
     elif type == 2:
         return value * 0.5 - 20
+    elif type == 3:
+        return value * 10
+    elif type == 4:
+        return value * 2 - 1
     else:
         return value
 
@@ -223,10 +230,14 @@ def frame_decode(data):
         for item, properties in ITEMS_MAPPING.items():
             # Decode the value based on its type
             if properties["Publish"]:
-                # Decode the value using the decode_value function
-                decoded_value = decode_value(data[properties["Index"]], properties["Type"])
-                # Store the decoded value in the dictionary
-                decoded_frame[item] = decoded_value
+                if item == "Soft":
+                    decoded_frame[item] = f"{data[properties['Index']]:02X}"
+                else:
+                    # Decode the value using the decode_value function
+                    decoded_value = decode_value(data[properties["Index"]], properties["Type"])
+                    # Store the decoded value in the dictionary
+                    decoded_frame[item] = decoded_value
+
     else:
         decoded_frame = None
         print("Invalid frame")
