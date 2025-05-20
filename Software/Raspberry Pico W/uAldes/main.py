@@ -36,8 +36,8 @@ from simple import MQTTClient
 import ualdes
 from config import MQTT_CONFIG,MQTT_TOPICS, WIFI_NETWORKS,UALDES_OPTIONS
 
-RELEASE_DATE = "11_05_2025"
-VERSION = "2.0"
+RELEASE_DATE = "20_05_2025"
+VERSION = "2.1"
 
 # Example of serial input format
 example_serial_input = [0x33, 0xff, 0x4c, 0x33, 0x26, 0x00, 0x01, 0x01, 0x98, 0x03, 0x00, 0x00, 0x88, 0x00, 0x00, 0x28, 
@@ -73,16 +73,33 @@ while max_wait > 0:
 if not wlan.isconnected():
   print('Failed to connect to WiFi. Restarting...')
   reset()
-  utime.sleep(0.1)
 led.on()
 print('Connection successful')
 print(wlan.ifconfig())
+
+def try_reconnect(max_attempts=5):
+    global client
+    attempts = 0
+    while attempts < max_attempts:
+        try:
+            print("Tentative de reconnexion MQTT...")
+            client = connect_and_subscribe()
+            print("Reconnexion MQTT réussie")
+            return
+        except Exception as e:
+            print("Échec de reconnexion MQTT :", e)
+            attempts += 1
+            utime.sleep(10)
+    print("Reconnexion impossible. Redémarrage du système.")
+    reset()
+
+
 
 def connect_and_subscribe():
   global client
   client = MQTTClient(MQTT_CONFIG["client_id"], MQTT_CONFIG["broker"],MQTT_CONFIG["port"],MQTT_CONFIG["user"],MQTT_CONFIG["password"])
   client.set_callback(sub_cb)
-  client.connect()
+  client.connect(timeout=5)
   client.subscribe(MQTT_TOPICS["command"])
   print('Connected to %s, subscribed to %s topic' % (MQTT_CONFIG["broker"], MQTT_TOPICS["command"]))
   return client
@@ -100,11 +117,27 @@ def sub_cb(topic, msg):
     led.on()
 
 # Connect to MQTT broker
-connect_and_subscribe()
+client = None
+try_reconnect()
+
+last_ping = utime.time()
+ping_interval = 30  # Ping toutes les 30 secondes
+
+
 while True:
   try:
     client.check_msg()
     uart_data = uart.read()
+
+
+    if (utime.time() - last_ping) > ping_interval:
+        try:
+            client.ping()
+            print("Ping envoyé")
+            last_ping = utime.time()
+        except Exception as e:
+            print("Erreur ping, tentative de reconnexion...")
+            try_reconnect()
 
     if (utime.time() - last_message) > UALDES_OPTIONS["refresh_time"]:
         if uart_data is not None:
@@ -129,4 +162,4 @@ while True:
     led.off()
     print('General error:', e)
     utime.sleep(10)
-    connect_and_subscribe()
+    try_reconnect()
