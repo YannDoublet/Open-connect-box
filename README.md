@@ -3,6 +3,8 @@
 
 Ce projet propose une passerelle USB permettant d'interfacer un chauffe-eau TFlow de la marque **Aldes** avec un système domotique basé sur le protocole **MQTT**. L'objectif est de permettre le contrôle à distance du chauffe-eau, la collecte de données et l'automatisation de certaines fonctions dans un environnement domotique.
 
+![HowItWorks](Software/HowItWorks.jpg)
+
 ---
 
 ## Hardware
@@ -48,6 +50,12 @@ Pour piloter votre système, publiez une commande JSON sur le topic :
 ```
 home/device/command
 ```
+
+Topic par défaut
+```
+aldes/commands
+```
+
 
 #### Format général
 
