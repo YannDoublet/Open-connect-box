@@ -38,6 +38,7 @@ Version: 1.0.0
 
 ITEMS_MAPPING = {
     "Soft": {"Index": 4, "Type": 0, "Publish": True},
+    "Entree_HC": {"Index": 9, "Type": 0, "Publish": True}, #3 => HC entrée non active / 7 => HC entrée active
     "Etat": {"Index": 6, "Type": 0, "Publish": True},
     "Comp_C": {"Index": 28, "Type": 1, "Publish": True},
     "Comp_R": {"Index": 29, "Type": 1, "Publish": True},
@@ -49,7 +50,78 @@ ITEMS_MAPPING = {
     "DP": {"Index": 38, "Type": 0, "Publish": True},
     "Ventil_flow": {"Index": 39, "Type": 4, "Publish": True},
     "Ventil_rpm": {"Index": 40, "Type": 3, "Publish": True},
+    "Conso_eau": {"Index": 49, "Type": 100, "Publish": True},
+    "Conso_ventil": {"Index": 41, "Type": 101, "Publish": True},
+    "byte_01": {"Index": 1, "Type": 0, "Publish": True},
+    "byte_02": {"Index": 2, "Type": 0, "Publish": True},
+    "byte_03": {"Index": 3, "Type": 0, "Publish": True},
+    "byte_05": {"Index": 5, "Type": 0, "Publish": True},
+    "byte_07": {"Index": 7, "Type": 0, "Publish": True},
+    "byte_08": {"Index": 8, "Type": 0, "Publish": True},
+    "byte_09": {"Index": 9, "Type": 0, "Publish": True},
+    "byte_10": {"Index": 10, "Type": 0, "Publish": True},
+    "byte_11": {"Index": 11, "Type": 0, "Publish": True},
+    "byte_12": {"Index": 12, "Type": 0, "Publish": True},
+    "byte_13": {"Index": 13, "Type": 0, "Publish": True},
+    "byte_14": {"Index": 14, "Type": 0, "Publish": True},
+    "byte_15": {"Index": 15, "Type": 0, "Publish": True},
+    "byte_16": {"Index": 16, "Type": 0, "Publish": True},
+    "byte_17": {"Index": 17, "Type": 0, "Publish": True},
+    "byte_18": {"Index": 18, "Type": 0, "Publish": True},
+    "byte_19": {"Index": 19, "Type": 0, "Publish": True},
+    "byte_20": {"Index": 20, "Type": 0, "Publish": True},
+    "byte_21": {"Index": 21, "Type": 0, "Publish": True},
+    "byte_22": {"Index": 22, "Type": 0, "Publish": True},
+    "byte_23": {"Index": 23, "Type": 0, "Publish": True},
+    "byte_24": {"Index": 24, "Type": 0, "Publish": True},
+    "byte_25": {"Index": 25, "Type": 0, "Publish": True},
+    "byte_26": {"Index": 26, "Type": 0, "Publish": True},
+    "byte_27": {"Index": 27, "Type": 0, "Publish": True},
+    "byte_30": {"Index": 30, "Type": 0, "Publish": True},
+    "byte_31": {"Index": 31, "Type": 0, "Publish": True},
+    "byte_35": {"Index": 35, "Type": 0, "Publish": True},
+    "byte_41": {"Index": 41, "Type": 0, "Publish": True},
+    "byte_42": {"Index": 42, "Type": 0, "Publish": True},
+    "byte_43": {"Index": 43, "Type": 0, "Publish": True},
+    "byte_44": {"Index": 44, "Type": 0, "Publish": True},
+    "byte_45": {"Index": 45, "Type": 0, "Publish": True},
+    "byte_46": {"Index": 46, "Type": 0, "Publish": True},
+    "byte_47": {"Index": 47, "Type": 0, "Publish": True},
+    "byte_48": {"Index": 48, "Type": 0, "Publish": True},
+    "byte_49": {"Index": 49, "Type": 0, "Publish": True},
+    "byte_50": {"Index": 50, "Type": 0, "Publish": True},
+    "byte_51": {"Index": 51, "Type": 0, "Publish": True},
+    "byte_52": {"Index": 52, "Type": 0, "Publish": True},
+    "byte_53": {"Index": 53, "Type": 0, "Publish": True},
+    "byte_54": {"Index": 54, "Type": 0, "Publish": True},
+    "byte_55": {"Index": 55, "Type": 0, "Publish": True},
+    "byte_56": {"Index": 56, "Type": 0, "Publish": True},
+    "byte_57": {"Index": 57, "Type": 0, "Publish": True},
+    "byte_58": {"Index": 58, "Type": 0, "Publish": True},
+    "byte_59": {"Index": 59, "Type": 0, "Publish": True},
+    "byte_60": {"Index": 60, "Type": 0, "Publish": True},
+    "byte_61": {"Index": 61, "Type": 0, "Publish": True},
+    "byte_62": {"Index": 62, "Type": 0, "Publish": True},
+    "byte_63": {"Index": 63, "Type": 0, "Publish": True},
+    "byte_64": {"Index": 64, "Type": 0, "Publish": True},
+    "byte_65": {"Index": 65, "Type": 0, "Publish": True},
+    "byte_66": {"Index": 66, "Type": 0, "Publish": True},
+    "byte_67": {"Index": 67, "Type": 0, "Publish": True},
+    "byte_68": {"Index": 68, "Type": 0, "Publish": True},
+    "byte_69": {"Index": 69, "Type": 0, "Publish": True},
+    "byte_70": {"Index": 70, "Type": 0, "Publish": True},
+    "byte_71": {"Index": 71, "Type": 0, "Publish": True},
+    "byte_72": {"Index": 72, "Type": 0, "Publish": True},
+    "Test_type_0": {"Index": 39, "Type": 0, "Publish": False},
+    "Test_type_1": {"Index": 39, "Type": 1, "Publish": False},
+    "Test_type_2": {"Index": 39, "Type": 2, "Publish": False},
+    "Test_type_3": {"Index": 39, "Type": 3, "Publish": False},
+    "Test_type_4": {"Index": 39, "Type": 4, "Publish": False},
 }
+
+
+
+
 
 def aldes_checksum(data):
     """
@@ -178,22 +250,18 @@ def frame_encode(command):
         print("Invalid command")
         return None
 
-def decode_value(value,type):
-    def decode_value(value, type):
-        """
-        Decodes a given value based on the specified type.
-
-        Parameters:
-            value (float or int): The input value to be decoded.
-            type (int): The decoding type. Acceptable values are:
-                - 0: Returns the value as is.
-                - 1: Divides the value by 2.
-                - 2: Multiplies the value by 0.5 and subtracts 20.
-                - Any other value: Returns the value as is.
-
-        Returns:
-            float: The decoded value based on the specified type.
-        """
+def decode_value(value, type, data=None, index=None):
+    """
+    Decode a value based on its type.
+    type:
+    - 0: No processing
+    - 1: Divide by 2
+    - 2: Multiply by 0.5 then subtract 20
+    - 3: Multiply by 10
+    - 4: Multiply by 2 then subtract 1
+    - 100: Special processing for conso_eau
+    - 101: Special processing for conso_ventil
+    """
     if type == 0:
         return value
     elif type == 1:
@@ -204,8 +272,50 @@ def decode_value(value,type):
         return value * 10
     elif type == 4:
         return value * 2 - 1
+    elif type == 100 and data is not None and index is not None:
+        try:
+            byte_49 = data[index]
+            byte_50 = data[index + 1]
+            byte_51 = data[index + 2]
+            byte_52 = data[index + 3]
+
+            coeffs = [0.0000152587890625, 0.00390625, 1, 256]
+            valeurs = [
+                byte_49 * coeffs[0],
+                byte_50 * coeffs[1],
+                byte_51 * coeffs[2],
+                byte_52 * coeffs[3]
+            ]
+            valeur_brute = sum(valeurs)
+            valeur_finale = valeur_brute + 657
+
+            return round(valeur_finale, 3)
+        except IndexError:
+            return None
+    elif type == 101 and data is not None and index is not None:
+        try:
+            byte_41 = data[index]
+            byte_42 = data[index + 1]
+            byte_43 = data[index + 2]
+            byte_44 = data[index + 3]
+
+            coeffs = [0.0000152587890625, 0.00390625, 1, 256]
+            valeurs = [
+                byte_41 * coeffs[0] -1,
+                byte_42 * coeffs[1] -1,
+                byte_43 * coeffs[2] -1,
+                byte_44 * coeffs[3] -1
+            ]
+            valeur_brute = sum(valeurs)
+            valeur_finale = valeur_brute
+
+            return round(valeur_finale, 3)
+        except IndexError:
+            return None
     else:
         return value
+
+
 
 def frame_decode(data):
     """
@@ -234,7 +344,11 @@ def frame_decode(data):
                     decoded_frame[item] = f"{data[properties['Index']]:02X}"
                 else:
                     # Decode the value using the decode_value function
-                    decoded_value = decode_value(data[properties["Index"]], properties["Type"])
+                    # decoded_value = decode_value(data[properties["Index"]], properties["Type"])
+                    # decoded_value = decode_value(data[properties["Index"]], properties["Type"], data, properties["Index"])
+                    decoded_value = decode_value(data[properties["Index"]], properties["Type"], data, properties["Index"])
+
+
                     # Store the decoded value in the dictionary
                     decoded_frame[item] = decoded_value
 
