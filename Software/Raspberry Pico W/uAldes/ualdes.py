@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 import json
+
 """
 UAldes - Python library for Aldes UART Protocol
 
@@ -37,7 +38,8 @@ Version: 1.0.0
 """
 
 ITEMS_MAPPING = {
-    "Soft": {"Index": 4, "Type": 0, "Publish": True},
+    "Soft": {"Index": 4, "Type": -1, "Publish": True},
+    "Entree_HC": {"Index": 9, "Type": 0, "Publish": True},
     "Etat": {"Index": 6, "Type": 0, "Publish": True},
     "Comp_C": {"Index": 28, "Type": 1, "Publish": True},
     "Comp_R": {"Index": 29, "Type": 1, "Publish": True},
@@ -49,44 +51,21 @@ ITEMS_MAPPING = {
     "DP": {"Index": 38, "Type": 0, "Publish": True},
     "Ventil_flow": {"Index": 39, "Type": 4, "Publish": True},
     "Ventil_rpm": {"Index": 40, "Type": 3, "Publish": True},
+    "Conso_ventil": {"Index": 41, "Type": 101, "Publish": True},
+    "Conso_eau": {"Index": 49, "Type": 100, "Publish": True},
 }
 
-def aldes_checksum(data):
-    """
-        Returns the checksum of the data.
-        The checksum is the last byte of the data, and is calculated as the 2's complement of the sum of all previous bytes.
-        The checksum is valid if the sum of all bytes (including the checksum) is equal to 0x00.
-        :param data: list of integers (bytes)
-        :return: checksum of the data
-    """
+# Auto-génération des byte_01 à byte_73 et leur version hex brute
+for i in range(1, 74):
+    key = f"byte_{i:02d}"
+    key_raw = f"byte_{i:02d}_raw"
+    ITEMS_MAPPING[key] = {"Index": i, "Type": 0, "Publish": True}      # Valeur décodée
+    ITEMS_MAPPING[key_raw] = {"Index": i, "Type": -1, "Publish": True}  # Hex brute
 
-    checksum = -sum(data[:-1]) & 0xFF
-    return checksum
+def aldes_checksum(data):
+    return -sum(data[:-1]) & 0xFF
 
 def aldes_checksum_test(data):
-    """
-    Verify the ALDES checksum of a data packet.
-
-    The ALDES checksum is calculated by summing all bytes except the last one, 
-    negating the sum, and taking the least significant byte (modulo 256). 
-    The checksum is valid if this calculated value equals the last byte of the data.
-
-    Parameters
-    ----------
-    data : list or bytes
-        The data packet including the checksum as the last byte.
-
-    Returns
-    -------
-    bool
-        True if the checksum matches, False otherwise.
-
-    Notes
-    -----
-    The function also prints "Checksum OK" if the checksum is valid, 
-    or "Checksum KO" if it is invalid.
-    """
-
     if (-sum(data[:-1]) & 0xFF) == data[-1]:
         print("Checksum OK")
         return True
@@ -95,63 +74,12 @@ def aldes_checksum_test(data):
         return False
 
 def frame_encode(command):
-    """
-    Encodes a JSON command into a specific frame format for UART communication.
-    
-    This function takes a JSON string command, parses it to extract the frame type
-    and parameters, then creates a properly formatted byte array according to the
-    specified protocol. It also calculates and appends the appropriate checksum.
-    
-    Parameters:
-    -----------
-    command : str
-        A JSON string containing the command type and parameters.
-        Expected format: {"type": "<command_type>", "params": {...}}
-        
-        Supported command types:
-        - "auto": Sets the device to automatic mode
-        - "boost": Sets the device to boost mode
-        - "confort": Sets the device to comfort mode with specified duration in days
-        - "vacances": Sets the device to vacation mode with specified duration in days
-        - "temp": Sets a specific temperature
-        - "debug": Sets a debug mode with specified duration
-        
-        Parameters vary by command type:
-        - "confort": {"duration": int} (days, default: 2)
-        - "vacances": {"duration": int} (days, default: 10)
-        - "temp": {"temperature": float} (degrees Celsius)
-        - "debug": {"duration": int} (default: 1)
-    
-    Returns:
-    --------
-    list or None
-        A list of integers representing the encoded frame bytes if successful,
-        or None if the command parsing fails.
-        
-    Format of returned frame:
-    [0xFD, 0xA0, 0x09, 0xA0, temp_byte, cmd_byte, param1, param2, 0x9F, checksum]
-    
-    Example:
-    --------
-    >>> frame_encode('{"type": "auto"}')
-    [253, 160, 9, 160, 255, 1, 255, 255, 159, 117]
-    
-    >>> frame_encode('{"type": "temp", "params": {"temperature": 20.5}}')
-    [253, 160, 9, 160, 41, 255, 255, 255, 159, 75]
-    """
-
     try:
-        # Decode the JSON command
         command_data = json.loads(command)
-
-        # Extract the frame type and parameters
         frame_type = command_data.get("type")
         params = command_data.get("params", {})
-
-        # Define the base frame structure
         base_frame = [0xFD, 0xA0, 0x09, 0xA0, 0xFF, 0xFF, 0xFF, 0xFF, 0x9F]
 
-        # Modify the frame based on the type and parameters
         if frame_type == "auto":
             base_frame[5] = 0x01
         elif frame_type == "boost":
@@ -159,42 +87,27 @@ def frame_encode(command):
         elif frame_type == "confort":
             base_frame[5] = 0x03
             base_frame[6] = 0x00
-            base_frame[7] = params.get("duration", 0x02) # int in days
+            base_frame[7] = params.get("duration", 0x02)
         elif frame_type == "vacances":
             base_frame[5] = 0x04
             base_frame[6] = 0x00
-            base_frame[7] = params.get("duration", 0x0A) # int in days
+            base_frame[7] = params.get("duration", 0x0A)
         elif frame_type == "temp":
-            base_frame[4] = int(params.get("temperature", 0x85)*2) # float in °C
+            base_frame[4] = int(params.get("temperature", 0x85) * 2)
         elif frame_type == "debug":
             base_frame[5] = params.get("duration", 0x01)
 
-        # Calculate the checksum
         checksum = -sum(base_frame) & 0xFF
         base_frame.append(checksum)
         return base_frame
-
-    except :
+    except:
         print("Invalid command")
         return None
 
-def decode_value(value,type):
-    def decode_value(value, type):
-        """
-        Decodes a given value based on the specified type.
-
-        Parameters:
-            value (float or int): The input value to be decoded.
-            type (int): The decoding type. Acceptable values are:
-                - 0: Returns the value as is.
-                - 1: Divides the value by 2.
-                - 2: Multiplies the value by 0.5 and subtracts 20.
-                - Any other value: Returns the value as is.
-
-        Returns:
-            float: The decoded value based on the specified type.
-        """
-    if type == 0:
+def decode_value(value, type, data=None, index=None):
+    if type == -1:
+        return f"{value:02X}"
+    elif type == 0:
         return value
     elif type == 1:
         return value / 2
@@ -204,44 +117,56 @@ def decode_value(value,type):
         return value * 10
     elif type == 4:
         return value * 2 - 1
+    elif type == 100 and data is not None and index is not None:
+        try:
+            byte_49 = data[index]
+            byte_50 = data[index + 1]
+            byte_51 = data[index + 2]
+            byte_52 = data[index + 3]
+            coeffs = [0.0000152587890625, 0.00390625, 1, 256]
+            valeurs = [
+                byte_49 * coeffs[0],
+                byte_50 * coeffs[1],
+                byte_51 * coeffs[2],
+                byte_52 * coeffs[3]
+            ]
+            valeur_brute = sum(valeurs)
+            return round(valeur_brute + 657, 3)
+        except IndexError:
+            return None
+    elif type == 101 and data is not None and index is not None:
+        try:
+            byte_41 = data[index]
+            byte_42 = data[index + 1]
+            byte_43 = data[index + 2]
+            byte_44 = data[index + 3]
+            coeffs = [0.0000152587890625, 0.00390625, 1, 256]
+            valeurs = [
+                byte_41 * coeffs[0] + 24,
+                byte_42 * coeffs[1] + 24,
+                byte_43 * coeffs[2] + 24,
+                byte_44 * coeffs[3] + 24
+            ]
+            valeur_brute = sum(valeurs)
+            return round(valeur_brute, 3)
+        except IndexError:
+            return None
     else:
         return value
 
 def frame_decode(data):
-    """
-    Decodes a given data frame into a dictionary of interpreted values.
-
-    The function checks the validity of the input data frame using a checksum test.
-    If the frame is valid, it decodes the values based on predefined mappings and types.
-    If the frame is invalid, it sets the "Etat" key in the decoded frame to 0 and prints an error message.
-
-    Args:
-        data (list): A list of integers representing the data frame to be decoded.
-
-    Returns:
-        dict: A dictionary containing the decoded values. If the frame is invalid, the dictionary
-              will contain only the key "Etat" with a value of 0.
-    """
-
     decoded_frame = {}
-
-    # Check if the frame is valid
     if aldes_checksum_test(data):
         for item, properties in ITEMS_MAPPING.items():
-            # Decode the value based on its type
             if properties["Publish"]:
-                if item == "Soft":
-                    decoded_frame[item] = f"{data[properties['Index']]:02X}"
-                else:
-                    # Decode the value using the decode_value function
-                    decoded_value = decode_value(data[properties["Index"]], properties["Type"])
-                    # Store the decoded value in the dictionary
-                    decoded_frame[item] = decoded_value
-
+                decoded_value = decode_value(
+                    data[properties["Index"]],
+                    properties["Type"],
+                    data,
+                    properties["Index"]
+                )
+                decoded_frame[item] = decoded_value
     else:
         decoded_frame = None
         print("Invalid frame")
-
     return decoded_frame
-
-
