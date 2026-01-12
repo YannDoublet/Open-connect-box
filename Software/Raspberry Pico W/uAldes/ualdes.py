@@ -23,6 +23,7 @@ SOFTWARE.
 """
 
 import json
+from config import ITEMS_MAPPING
 """
 UAldes - Python library for Aldes UART Protocol
 
@@ -33,23 +34,29 @@ for various device operations such as mode switching and temperature control.
 
 Author: Yann DOUBLET
 License: MIT
-Version: 1.0.0
 """
+RELEASE_DATE = "12_01_2026"
+VERSION = "1.2"
 
-ITEMS_MAPPING = {
-    "Soft": {"Index": 4, "Type": 0, "Publish": True},
-    "Etat": {"Index": 6, "Type": 0, "Publish": True},
-    "Comp_C": {"Index": 28, "Type": 1, "Publish": True},
-    "Comp_R": {"Index": 29, "Type": 1, "Publish": True},
-    "T_hp": {"Index": 32, "Type": 2, "Publish": True},
-    "T_vmc": {"Index": 33, "Type": 2, "Publish": True},
-    "T_evap": {"Index": 34, "Type": 2, "Publish": True},
-    "T_haut": {"Index": 36, "Type": 2, "Publish": True},
-    "T_bas": {"Index": 37, "Type": 2, "Publish": True},
-    "DP": {"Index": 38, "Type": 0, "Publish": True},
-    "Ventil_flow": {"Index": 39, "Type": 4, "Publish": True},
-    "Ventil_rpm": {"Index": 40, "Type": 3, "Publish": True},
-}
+# Try to import ITEMS_MAPPING from config.py, otherwise use local definition
+try:
+    pass
+except (ImportError, AttributeError):
+    # If config.py doesn't exist or doesn't contain ITEMS_MAPPING, use the local definition
+    ITEMS_MAPPING = {
+        "Soft": {"Index": 4, "Type": 5, "Publish": True},
+        "Etat": {"Index": 6, "Type": 0, "Publish": True},
+        "Comp_C": {"Index": 28, "Type": 1, "Publish": True},
+        "Comp_R": {"Index": 29, "Type": 1, "Publish": True},
+        "T_hp": {"Index": 32, "Type": 2, "Publish": True},
+        "T_vmc": {"Index": 33, "Type": 2, "Publish": True},
+        "T_evap": {"Index": 34, "Type": 2, "Publish": True},
+        "T_haut": {"Index": 36, "Type": 2, "Publish": True},
+        "T_bas": {"Index": 37, "Type": 2, "Publish": True},
+        "DP": {"Index": 38, "Type": 0, "Publish": True},
+        "Ventil_flow": {"Index": 39, "Type": 4, "Publish": True},
+        "Ventil_rpm": {"Index": 40, "Type": 3, "Publish": True},
+    }
 
 def aldes_checksum(data):
     """
@@ -178,34 +185,83 @@ def frame_encode(command):
         print("Invalid command")
         return None
 
+def decode_temperature_bcd(value):
+    """
+    Decodes a temperature value encoded with BCD (Binary Coded Decimal) 
+    and 0.25°C precision using the 2 least significant bits.
+    
+    The temperature is encoded as follows:
+    - The 2 least significant bits (bits 0-1) represent the decimal part: 
+      0b00 = 0.00°C, 0b01 = 0.25°C, 0b10 = 0.50°C, 0b11 = 0.75°C
+    - The remaining bits (bits 2-7) are shifted right by 2 and decoded as BCD
+      for the integer part of the temperature.
+    
+    Parameters:
+        value (int): The encoded temperature byte (0x00 to 0xFF).
+    
+    Returns:
+        float: The decoded temperature in degrees Celsius.
+    
+    Example:
+        >>> decode_temperature_bcd(0x62)  # Binary: 0110 0010
+        18.5
+        # Bits 0-1: 0b10 = 2 -> 2 x 0.25 = 0.5°C
+        # Bits 2-7: 0x62 >> 2 = 0x18 -> BCD 18 = 18°C
+        # Result: 18 + 0.5 = 18.5°C
+    """
+    
+    # Extract the 2 least significant bits for decimal part
+    decimal_bits = value & 0b11
+    decimal_part = decimal_bits * 0.25
+    
+    # Shift right by 2 bits to get the BCD encoded integer part
+    bcd_value = value >> 2
+    
+    # Decode BCD: extract tens and units
+    tens = (bcd_value >> 4) & 0x0F
+    units = bcd_value & 0x0F
+    integer_part = tens * 10 + units
+    
+    # Combine integer and decimal parts
+    temperature = integer_part + decimal_part
+    
+    return temperature
+
 def decode_value(value,type):
-    def decode_value(value, type):
-        """
-        Decodes a given value based on the specified type.
+    """
+    Decodes a numeric value based on the specified type and returns it as a string.
 
-        Parameters:
-            value (float or int): The input value to be decoded.
-            type (int): The decoding type. Acceptable values are:
-                - 0: Returns the value as is.
-                - 1: Divides the value by 2.
-                - 2: Multiplies the value by 0.5 and subtracts 20.
-                - Any other value: Returns the value as is.
+    Parameters:
+        value (numeric): The value to be decoded.
+        type (int): The decoding type to apply:
+            0: Return as is
+            1: Divide by 2
+            2: Multiply by 0.5 and subtract 20 (temperature conversion)
+            3: Multiply by 10
+            4: Multiply by 2 and subtract 1
+            5: Convert to hexadecimal and return last 2 characters
+            other: Return as is
 
-        Returns:
-            float: The decoded value based on the specified type.
-        """
+    Returns:
+        str: The decoded value as a string.
+    """
+
     if type == 0:
-        return value
+        return str(value)
     elif type == 1:
-        return value / 2
+        return str(value / 2)
     elif type == 2:
-        return value * 0.5 - 20
-    elif type == 3:
-        return value * 10
+        return str(value * 0.5 - 20)
+    elif type == 3: 
+        return str(value * 10)
     elif type == 4:
-        return value * 2 - 1
+        return str(value * 2-1)
+    elif type == 5:
+        return str(hex(value)[-2:])
+    elif type == 6:
+        return str(decode_temperature_bcd(value))
     else:
-        return value
+        return str(value)
 
 def frame_decode(data):
     """
@@ -230,13 +286,10 @@ def frame_decode(data):
         for item, properties in ITEMS_MAPPING.items():
             # Decode the value based on its type
             if properties["Publish"]:
-                if item == "Soft":
-                    decoded_frame[item] = f"{data[properties['Index']]:02X}"
-                else:
-                    # Decode the value using the decode_value function
-                    decoded_value = decode_value(data[properties["Index"]], properties["Type"])
-                    # Store the decoded value in the dictionary
-                    decoded_frame[item] = decoded_value
+                # Decode the value using the decode_value function
+                decoded_value = decode_value(data[properties["Index"]], properties["Type"])
+                # Store the decoded value in the dictionary
+                decoded_frame[item] = decoded_value
 
     else:
         decoded_frame = None
