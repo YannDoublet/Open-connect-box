@@ -241,6 +241,7 @@ def decode_value(value,type):
             4: Multiply by 2 and subtract 1
             5: Convert to hexadecimal and return last 2 characters
             other: Return as is
+            6: Decode as BCD temperature with 0.25°C precision
 
     Returns:
         str: The decoded value as a string.
