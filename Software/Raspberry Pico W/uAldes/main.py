@@ -49,6 +49,7 @@ rx_buffer = bytearray(RX_BUFFER_SIZE)
 rx_write_pos = 0
 rx_read_pos = 0
 start = None
+frame_type = None
 
 # Statistics
 stats_frames_ok = 0
@@ -72,7 +73,7 @@ if UALDES_OPTIONS["device"] == "T.Flow":
 elif UALDES_OPTIONS["device"] == "EASYHOME":
     # UART to VMC setup :
     uart = UART(0, baudrate=2400, bits=8, parity=0, stop=1, 
-             tx=Pin(0), rx=Pin(1))
+             tx=Pin(0), rx=Pin(1), invert=UART.INV_TX)
     print("Info: ALDES DEVICE: EASYHOME")
 else:
     print(f"Configuration error: ALDES DEVICE not recognized: ", UALDES_OPTIONS["device"])
@@ -121,7 +122,6 @@ def try_reconnect(max_attempts=5):
 
 def uart_to_buffer():
     global rx_write_pos, rx_read_pos, stats_buffer_overflow
-    
     if not uart.any():
         return 0
     
@@ -149,7 +149,7 @@ def uart_to_buffer():
     return bytes_written
 
 def extract_frame_from_buffer():
-    global rx_read_pos, rx_write_pos, rx_buffer, start
+    global rx_read_pos, rx_write_pos, rx_buffer, start, frame_type
     available = (rx_write_pos - rx_read_pos) % RX_BUFFER_SIZE
     if available < 2:
         return None
@@ -159,16 +159,21 @@ def extract_frame_from_buffer():
         for i in range(0, available, 2):
             idx = (rx_read_pos + i) % RX_BUFFER_SIZE
             if rx_buffer[idx] == FRAME_INFO["RX_MASTER_IDENTIFIER"] and rx_buffer[(idx + 1)% RX_BUFFER_SIZE] == FRAME_INFO["RX_SLAVE_IDENTIFIER"]:
+                frame_type = "VMC"
                 start = idx
                 break
-    
+            elif rx_buffer[idx] == FRAME_INFO["TX_MASTER_IDENTIFIER"] and rx_buffer[(idx + 1)% RX_BUFFER_SIZE] == FRAME_INFO["TX_SLAVE_IDENTIFIER"]:
+                frame_type = "HUB"
+                start = idx
+                break
+
     # If start is still not found, move the rx position to last position in the buffer and come back later
     if start is None:
         rx_read_pos = rx_write_pos
         return None
     
     # The buffer need to be at least equal to data start + ITEM_MAPPING["Data_Lenght"]["Index"]
-    Data_Lenght_Position = start + ITEMS_MAPPING["Data_Lenght"]["Index"]
+    Data_Lenght_Position = (start + ITEMS_MAPPING["Data_Lenght"]["Index"]) % RX_BUFFER_SIZE
     #print ("Data_Lenght_Position: ", Data_Lenght_Position)
     #print ("rx_read_pos: ", rx_read_pos)
     #print ("available: ", available)
@@ -206,7 +211,7 @@ def sub_cb(topic, msg):
     led.off()
     print('Received command: %s' % msg)
     input_cmd = frame_encode(msg)
-    print(input_cmd)
+    print(bytes(input_cmd))
     if input_cmd != None:      
        print(uart.write(bytearray(input_cmd)))
        utime.sleep(0.5)
@@ -276,30 +281,31 @@ while True:
     elif UALDES_OPTIONS["device"] == "EASYHOME":
         if uart_data is not None:
             print("Trame received at: ", utime.time())
-            print(uart_data)
+            print(frame_type, uart_data)
             print("Taille : " + str(len(uart_data)))
             try:
                 led.off()
-                client.publish(MQTT_TOPICS["main"]+UALDES_OPTIONS["serial_number"]+"/trame", bytearray(uart_data).hex(" "))
-                decoded_data = frame_decode(uart_data)
-                if decoded_data is not None:  # Check if data was decoded successfully
-                    for group, properties in MQTT_GROUPS.items():
-                        payload = "{"
-                        for topic, data in properties.items():
-                            # Add a comma in case it is not the first one
-                            if payload != "{":
-                                payload = payload+","
-                            payload = payload+"\""+topic+"\":"+str(decoded_data[data])+""
-                        payload = payload+"}"
-                        client.publish(MQTT_TOPICS["main"]+UALDES_OPTIONS["serial_number"]+"/"+group, payload)
-                        #print(f"{MQTT_TOPICS['main']}{group}: \{{topic}: {decoded_data[topic]}\}")
-                        uart_data = None
-                    if UALDES_OPTIONS["device_in_ha"]:
-                        for sensor, info in MQTT_HA.items():
-                            payload = json.dumps(info["properties"])
-                            client.publish(MQTT_TOPICS["haPrefix"]+info["type"]+"/aldes/"+UALDES_OPTIONS["serial_number"]+"_"+str(sensor)+"/config", payload)
+                client.publish(MQTT_TOPICS["main"]+UALDES_OPTIONS["serial_number"]+"/trame_"+frame_type, bytearray(uart_data).hex(" "))
+                if frame_type == "VMC":
+                    decoded_data = frame_decode(uart_data)
+                    if decoded_data is not None:  # Check if data was decoded successfully
+                        for group, properties in MQTT_GROUPS.items():
+                            payload = "{"
+                            for topic, data in properties.items():
+                                # Add a comma in case it is not the first one
+                                if payload != "{":
+                                    payload = payload+","
+                                payload = payload+"\""+topic+"\":"+str(decoded_data[data])+""
+                            payload = payload+"}"
+                            client.publish(MQTT_TOPICS["main"]+UALDES_OPTIONS["serial_number"]+"/"+group, payload)
                             #print(f"{MQTT_TOPICS['main']}{group}: \{{topic}: {decoded_data[topic]}\}")
                             uart_data = None
+                        if UALDES_OPTIONS["device_in_ha"]:
+                            for sensor, info in MQTT_HA.items():
+                                payload = json.dumps(info["properties"])
+                                client.publish(MQTT_TOPICS["haPrefix"]+info["type"]+"/aldes/"+UALDES_OPTIONS["serial_number"]+"_"+str(sensor)+"/config", payload)
+                                #print(f"{MQTT_TOPICS['main']}{group}: \{{topic}: {decoded_data[topic]}\}")
+                                uart_data = None
                 last_message = utime.time()
                 utime.sleep(0.2)
                 led.on()
