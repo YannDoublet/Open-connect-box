@@ -34,7 +34,7 @@ for various device operations such as mode switching and temperature control.
 
 Author: Yann DOUBLET
 License: MIT
-Version: 1.0.0
+Version: 1.1.0
 """
 
 ITEMS_MAPPING = {
@@ -51,8 +51,13 @@ ITEMS_MAPPING = {
     "DP": {"Index": 38, "Type": 0, "Publish": True},
     "Ventil_flow": {"Index": 39, "Type": 4, "Publish": True},
     "Ventil_rpm": {"Index": 40, "Type": 3, "Publish": True},
-    "Conso_ventil": {"Index": 41, "Type": 101, "Publish": True},
-    "Conso_eau": {"Index": 49, "Type": 100, "Publish": True},
+
+    # --- Nouveaux compteurs (W·min -> kWh = raw / 60000) ---
+    "Conso_vmc": {"Index": 41, "Type": 110, "Publish": True},           # Compteur 1 : b[41..44]
+    "Conso_pac": {"Index": 49, "Type": 111, "Publish": True},           # Compteur 2 : b[49..52]
+    "Conso_resistance": {"Index": 57, "Type": 112, "Publish": True},    # Compteur 3 : b[57..60]
+    "Conso_totale": {"Index": 0, "Type": 113, "Publish": True},         # Somme (calculée)
+    "Conso_eau": {"Index": 0, "Type": 114, "Publish": True},            # Somme (calculée)
 }
 
 # Auto-génération des byte_01 à byte_73 et leur version hex brute
@@ -104,6 +109,14 @@ def frame_encode(command):
         print("Invalid command")
         return None
 
+def _u32_le(data, index):
+    """Decode 32-bit little-endian unsigned int from data[index:index+4]."""
+    return data[index] + (data[index + 1] << 8) + (data[index + 2] << 16) + (data[index + 3] << 24)
+
+def _wmin_to_kwh(wmin):
+    """Convert Watt-minutes (W·min) to kWh."""
+    return wmin / 60000.0
+
 def decode_value(value, type, data=None, index=None):
     if type == -1:
         return f"{value:02X}"
@@ -117,40 +130,32 @@ def decode_value(value, type, data=None, index=None):
         return value * 10
     elif type == 4:
         return value * 2 - 1
-    elif type == 100 and data is not None and index is not None:
+
+    # --- Nouveaux compteurs en W·min ---
+    elif type in (110, 111, 112) and data is not None and index is not None:
+        # 110: Conso_vmc  -> Compteur 1 (b[41..44])
+        # 111: Conso_pac  -> Compteur 2 (b[49..52])
+        # 112: Conso_resistance -> Compteur 3 (b[57..60])
         try:
-            byte_49 = data[index]
-            byte_50 = data[index + 1]
-            byte_51 = data[index + 2]
-            byte_52 = data[index + 3]
-            coeffs = [0.0000152587890625, 0.00390625, 1, 256]
-            valeurs = [
-                byte_49 * coeffs[0],
-                byte_50 * coeffs[1],
-                byte_51 * coeffs[2],
-                byte_52 * coeffs[3]
-            ]
-            valeur_brute = sum(valeurs)
-            return round(valeur_brute + 657, 3)
+            raw_wmin = _u32_le(data, index)
+            return round(_wmin_to_kwh(raw_wmin), 3)
         except IndexError:
             return None
-    elif type == 101 and data is not None and index is not None:
+
+    # Sommes calculées (nécessitent les 3 compteurs déjà décodés)
+    elif type in (113, 114) and data is not None:
         try:
-            byte_41 = data[index]
-            byte_42 = data[index + 1]
-            byte_43 = data[index + 2]
-            byte_44 = data[index + 3]
-            coeffs = [0.0000152587890625, 0.00390625, 1, 256]
-            valeurs = [
-                byte_41 * coeffs[0] + 24,
-                byte_42 * coeffs[1] + 24,
-                byte_43 * coeffs[2] + 24,
-                byte_44 * coeffs[3] + 24
-            ]
-            valeur_brute = sum(valeurs)
-            return round(valeur_brute, 3)
+            c_vmc = _wmin_to_kwh(_u32_le(data, 41))
+            c_pac = _wmin_to_kwh(_u32_le(data, 49))
+            c_res = _wmin_to_kwh(_u32_le(data, 57))
+
+            if type == 113:  # Conso_totale
+                return round(c_vmc + c_pac + c_res, 3)
+            else:            # 114: Conso_eau
+                return round(c_pac + c_res, 3)
         except IndexError:
             return None
+
     else:
         return value
 
