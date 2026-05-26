@@ -23,7 +23,7 @@ SOFTWARE.
 """
 
 import json
-from config import ITEMS_MAPPING
+from config import UALDES_OPTIONS
 """
 UAldes - Python library for Aldes UART Protocol
 
@@ -35,28 +35,67 @@ for various device operations such as mode switching and temperature control.
 Author: Yann DOUBLET
 License: MIT
 """
-RELEASE_DATE = "12_01_2026"
-VERSION = "1.2"
+RELEASE_DATE = "26_05_2026"
+VERSION = "1.4"
+# VERSION 1.3 implement EASYHOME VMC
 
-# Try to import ITEMS_MAPPING from config.py, otherwise use local definition
-try:
-    pass
-except (ImportError, AttributeError):
-    # If config.py doesn't exist or doesn't contain ITEMS_MAPPING, use the local definition
+# Default values (overridden per device below)
+ITEMS_MAPPING = {}
+FRAME_INFO = {}
+base_frame = []
+
+if UALDES_OPTIONS["device"] == "TFLOW":
     ITEMS_MAPPING = {
-        "Soft": {"Index": 4, "Type": 5, "Publish": True},
-        "Etat": {"Index": 6, "Type": 0, "Publish": True},
-        "Comp_C": {"Index": 28, "Type": 1, "Publish": True},
-        "Comp_R": {"Index": 29, "Type": 1, "Publish": True},
-        "T_hp": {"Index": 32, "Type": 2, "Publish": True},
-        "T_vmc": {"Index": 33, "Type": 2, "Publish": True},
-        "T_evap": {"Index": 34, "Type": 2, "Publish": True},
-        "T_haut": {"Index": 36, "Type": 2, "Publish": True},
-        "T_bas": {"Index": 37, "Type": 2, "Publish": True},
-        "DP": {"Index": 38, "Type": 0, "Publish": True},
-        "Ventil_flow": {"Index": 39, "Type": 4, "Publish": True},
-        "Ventil_rpm": {"Index": 40, "Type": 3, "Publish": True},
+        "Soft":         {"Index": 4, "Type": 5, "Publish": True},
+        "Etat":         {"Index": 6, "Type": 0, "Publish": True},
+        "Comp_C":       {"Index": 28, "Type": 1, "Publish": True},
+        "Comp_R":       {"Index": 29, "Type": 1, "Publish": True},
+        "T_hp":         {"Index": 32, "Type": 2, "Publish": True},
+        "T_vmc":        {"Index": 33, "Type": 2, "Publish": True},
+        "T_evap":       {"Index": 34, "Type": 2, "Publish": True},
+        "T_haut":       {"Index": 36, "Type": 2, "Publish": True},
+        "T_bas":        {"Index": 37, "Type": 2, "Publish": True},
+        "DP":           {"Index": 38, "Type": 0, "Publish": True},
+        "Ventil_flow":  {"Index": 39, "Type": 4, "Publish": True},
+        "Ventil_rpm":   {"Index": 40, "Type": 3, "Publish": True},
     }
+    # Define the base frame structure
+    base_frame = [0xFD, 0xA0, 0x09, 0xA0, 0xFF, 0xFF, 0xFF, 0xFF, 0x9F]
+elif UALDES_OPTIONS["device"] == "EASYHOME":
+    ITEMS_MAPPING = {
+        "Slave":        {"Index": 0, "Type": 0, "Publish": False},
+        "Data_Lenght":  {"Index": 2, "Type": 0, "Publish": False},
+        "StartPattern": {"Index": 3, "Type": 0, "Publish": False},
+        "PwmQAI_1": 	{"LSB_Index": 8, "MSB_Index": 9, "Type": 10, "Publish": True},
+        "Mode":         {"Index": 10, "Type": 7, "Publish": True},
+        "Temp_Kitchen": {"Index": 14, "Type": 6, "Publish": True},
+        "Hum_Kitchen":  {"Index": 15, "Type": 0, "Publish": True},
+        "Temp_Bath1":   {"Index": 16, "Type": 6, "Publish": True},
+        "Hum_Bath1":    {"Index": 17, "Type": 0, "Publish": True},
+        "Temp_Bath2":   {"Index": 18, "Type": 6, "Publish": True},
+        "Hum_Bath2":    {"Index": 19, "Type": 0, "Publish": True},
+        "CO2": 		    {"LSB_Index": 20, "MSB_Index": 21, "Type": 10, "Publish": True},
+        "Hum_Variat":   {"Index": 23, "Type": 0, "Publish": True},
+        "PwmQAI_2": 	{"LSB_Index": 24, "MSB_Index": 25, "Type": 10, "Publish": False},
+        "EndPattern":   {"Index": 26, "Type": 0, "Publish": False},
+    }
+    FRAME_INFO = {
+            "TX_MASTER_IDENTIFIER" : 0xFD,
+            "TX_SLAVE_IDENTIFIER" : 0x87,
+            "RX_MASTER_IDENTIFIER" : 0x87,
+            "RX_SLAVE_IDENTIFIER" : 0x00
+    }
+    # Define the base frame structure
+    base_frame = [0xFD, 0x87, 0x11, 0x4B, 0x02, 0x02, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0x4A]
+else:
+    print(f"Configuration error: UALDES_OPTIONS[\"device\"] set to ", UALDES_OPTIONS["device"])
+    raise ValueError(f"Invalid device type: {UALDES_OPTIONS['device']}. Must be 'TFLOW' or 'EASYHOME'")
+
+# Verify that configuration was loaded correctly
+if not ITEMS_MAPPING:
+    raise ImportError("ITEMS_MAPPING not initialized. Check that config.py is present and UALDES_OPTIONS['device'] is set correctly.")
+
+print(f"UAldes module loaded - Device: {UALDES_OPTIONS['device']}, Version: {VERSION}")
 
 def aldes_checksum(data):
     """
@@ -155,31 +194,51 @@ def frame_encode(command):
         frame_type = command_data.get("type")
         params = command_data.get("params", {})
 
-        # Define the base frame structure
-        base_frame = [0xFD, 0xA0, 0x09, 0xA0, 0xFF, 0xFF, 0xFF, 0xFF, 0x9F]
+        # Work on a copy to avoid mutating the module-level base_frame
+        frame = list(base_frame)
 
-        # Modify the frame based on the type and parameters
-        if frame_type == "auto":
-            base_frame[5] = 0x01
-        elif frame_type == "boost":
-            base_frame[5] = 0x02
-        elif frame_type == "confort":
-            base_frame[5] = 0x03
-            base_frame[6] = 0x00
-            base_frame[7] = params.get("duration", 0x02) # int in days
-        elif frame_type == "vacances":
-            base_frame[5] = 0x04
-            base_frame[6] = 0x00
-            base_frame[7] = params.get("duration", 0x0A) # int in days
-        elif frame_type == "temp":
-            base_frame[4] = int(params.get("temperature", 0x85)*2) # float in °C
-        elif frame_type == "debug":
-            base_frame[5] = params.get("duration", 0x01)
+        if UALDES_OPTIONS["device"] == "TFLOW":
+
+            # Modify the frame based on the type and parameters
+            if frame_type == "auto":
+                frame[5] = 0x01
+            elif frame_type == "boost":
+                frame[5] = 0x02
+            elif frame_type == "confort":
+                frame[5] = 0x03
+                frame[6] = 0x00
+                frame[7] = params.get("duration", 0x02) # int in days
+            elif frame_type == "vacances":
+                frame[5] = 0x04
+                frame[6] = 0x00
+                frame[7] = params.get("duration", 0x0A) # int in days
+            elif frame_type == "temp":
+                frame[4] = int(params.get("temperature", 0x85)*2) # float in °C
+            elif frame_type == "debug":
+                frame[5] = params.get("duration", 0x01)
+
+        elif UALDES_OPTIONS["device"] == "EASYHOME":
+            if frame_type == 'Programming':
+                frame[8] = 0x10
+            elif frame_type == 'Holiday':
+                frame[8] = 0x21
+            elif frame_type == 'Daily':
+                frame[8] = 0x43
+            elif frame_type == 'Boost':
+                frame[8] = 0x65
+            elif frame_type == 'Guest':
+                frame[8] = 0x87
+            else:
+                print("Error: unknown command: ", command)
 
         # Calculate the checksum
-        checksum = -sum(base_frame) & 0xFF
-        base_frame.append(checksum)
-        return base_frame
+        checksum = (-sum(frame)) & 0xFF
+        print(f"Calculated checksum: {checksum:02X}")
+        print(f"Frame before checksum: {' '.join(f'{b:02X}' for b in frame)}")
+        frame.append(checksum)
+        print(f"Final frame: {' '.join(f'{b:02X}' for b in frame)}")
+        return frame
+
 
     except :
         print("Invalid command")
@@ -242,6 +301,8 @@ def decode_value(value,type):
             5: Convert to hexadecimal and return last 2 characters
             other: Return as is
             6: Decode as BCD temperature with 0.25°C precision
+            7: Decode as Mode (43 => Daily, 87 => Guest, 65 => Boost, 21 => Holiday, 10 => Programming)
+
 
     Returns:
         str: The decoded value as a string.
@@ -261,8 +322,40 @@ def decode_value(value,type):
         return str(hex(value)[-2:])
     elif type == 6:
         return str(decode_temperature_bcd(value))
+    elif type == 7:
+        if value == 0x43:
+            return "\"Daily\""
+        elif value == 0x87:
+            return "\"Guest\""
+        elif value == 0x65:
+            return "\"Boost\""
+        elif value == 0x21:
+            return "\"Holiday\""
+        elif value == 0x10:
+            return "\"Programming\""
+        else:
+            return "\"Unknown\""
     else:
         return str(value)
+
+def decode_value_double(value_MSB,value_LSB, type):
+    """
+    Decodes a numeric value encoded as a double and returns it as a string.
+
+    Parameters:
+        value_MSB (numeric): MSB of the value to be decoded.
+        value_LSB (numeric): LSB of the value to be decoded.
+        type (int): The decoding type to apply:
+            0: Return as is
+
+    Returns:
+        str: The decoded value as a string.
+    """
+
+    if type == 10:
+        return str(value_MSB*256+value_LSB)
+    else:
+        return str(value_MSB*256+value_LSB)
 
 def frame_decode(data):
     """
@@ -288,13 +381,17 @@ def frame_decode(data):
             # Decode the value based on its type
             if properties["Publish"]:
                 # Decode the value using the decode_value function
-                decoded_value = decode_value(data[properties["Index"]], properties["Type"])
+                # Check if it is a double or not
+                if properties["Type"] == 10:
+                    decoded_value = decode_value_double(data[properties["MSB_Index"]], data[properties["LSB_Index"]], properties["Type"])
+                else:
+                    decoded_value = decode_value(data[properties["Index"]], properties["Type"])
                 # Store the decoded value in the dictionary
                 decoded_frame[item] = decoded_value
 
     else:
         decoded_frame = None
-        print("Invalid frame")
+        print("Invalid frame", data)
 
     return decoded_frame
 

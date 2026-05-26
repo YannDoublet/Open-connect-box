@@ -29,15 +29,33 @@ SOFTWARE.
 from machine import Pin, UART, reset
 import utime
 import network, rp2
+import json
 
 #from umqttsimple import MQTTClient
 from simple import MQTTClient
+from config import MQTT_CONFIG, MQTT_TOPICS, MQTT_GROUPS, MQTT_HA, WIFI_NETWORKS, UALDES_OPTIONS ,ITEMS_MAPPING
 
-import ualdes
-from config import MQTT_CONFIG,MQTT_TOPICS, WIFI_NETWORKS,UALDES_OPTIONS
+#import ualdes
+from ualdes import FRAME_INFO, base_frame, frame_decode, frame_encode
 
-RELEASE_DATE = "20_05_2025"
-VERSION = "2.1"
+
+
+RELEASE_DATE = "26_05_2026"
+VERSION = "2.2"
+# VERSION 2.2 implement EASYHOME VMC
+
+# Circular Buffer to capture UART
+RX_BUFFER_SIZE = 1024
+rx_buffer = bytearray(RX_BUFFER_SIZE)
+rx_write_pos = 0
+rx_read_pos = 0
+start = None
+
+# Statistics
+stats_frames_ok = 0
+stats_frames_bad_checksum = 0
+stats_buffer_overflow = 0
+stats_frames_skipped = 0
 
 # Example of serial input format
 example_serial_input = [0x33, 0xff, 0x4c, 0x33, 0x26, 0x00, 0x01, 0x01, 0x98, 0x03, 0x00, 0x00, 0x88, 0x00, 0x00, 0x28, 
@@ -48,11 +66,25 @@ example_serial_input = [0x33, 0xff, 0x4c, 0x33, 0x26, 0x00, 0x01, 0x01, 0x98, 0x
 
 print(f"Release Date : {RELEASE_DATE}")
 
-# UART to STM32 setup :   
-uart = UART(0, baudrate=115200, tx=Pin(0), rx=Pin(1))
+if UALDES_OPTIONS["device"] == "TFLOW":
+    # UART to STM32 setup :   
+    uart = UART(0, baudrate=115200, tx=Pin(0), rx=Pin(1))
+    print("Info: ALDES DEVICE: T.Flow")
+elif UALDES_OPTIONS["device"] == "EASYHOME":
+    # UART to VMC setup :
+    uart = UART(0, baudrate=2400, bits=8, parity=0, stop=1, 
+             tx=Pin(0), rx=Pin(1), invert=UART.INV_TX)
+    print("Info: ALDES DEVICE: EASYHOME")
+else:
+    print(f"Configuration error: ALDES DEVICE not recognized: ", UALDES_OPTIONS["device"])
 
 # Software variables : 
 last_message = 0
+last_poll = 0
+# Last poll frame to send (initialized from base_frame, updated on each MQTT command)
+_pf = list(base_frame)
+_pf.append((-sum(_pf)) & 0xFF)
+current_poll_frame = bytearray(_pf)
 
 led=Pin("LED",Pin.OUT)
 led.off()
@@ -93,7 +125,76 @@ def try_reconnect(max_attempts=5):
     print("Reconnexion impossible. Redémarrage du système.")
     reset()
 
+def uart_to_buffer():
+    global rx_write_pos, rx_read_pos, stats_buffer_overflow
+    if not uart.any():
+        return 0
+    
+    bytes_written = 0
+    
+    while uart.any():
+        space_available = (rx_read_pos - rx_write_pos - 1) % RX_BUFFER_SIZE
+        if space_available == 0:
+            stats_buffer_overflow += 1
+            print("Buffer overflow!")
+            #break
+        
+        #read_size = min(space_available, uart.any())
+        read_size = uart.any()
+        data = uart.read(read_size)
+        
+        if not data:
+            break
+        
+        for b in data:
+            rx_buffer[rx_write_pos] = b
+            rx_write_pos = (rx_write_pos + 1) % RX_BUFFER_SIZE
+            bytes_written += 1
+    
+    return bytes_written
 
+def extract_frame_from_buffer():
+    global rx_read_pos, rx_write_pos, rx_buffer, start
+    available = (rx_write_pos - rx_read_pos) % RX_BUFFER_SIZE
+    if available < 2:
+        return None
+    
+    # Looking for VMC frame start identifier
+    if start is None:
+        for i in range(0, available, 2):
+            idx = (rx_read_pos + i) % RX_BUFFER_SIZE
+            if rx_buffer[idx] == FRAME_INFO["RX_MASTER_IDENTIFIER"] and rx_buffer[(idx + 1)% RX_BUFFER_SIZE] == FRAME_INFO["RX_SLAVE_IDENTIFIER"]:
+                start = idx
+                break
+
+    # If start is still not found, move the rx position to last position in the buffer and come back later
+    if start is None:
+        rx_read_pos = rx_write_pos
+        return None
+    
+    # The buffer need to be at least equal to data start + ITEM_MAPPING["Data_Lenght"]["Index"]
+    Data_Lenght_Position = (start + ITEMS_MAPPING["Data_Lenght"]["Index"]) % RX_BUFFER_SIZE
+    #print ("Data_Lenght_Position: ", Data_Lenght_Position)
+    #print ("rx_read_pos: ", rx_read_pos)
+    #print ("available: ", available)
+    if (rx_read_pos + available - 1) < Data_Lenght_Position:
+        return None
+    
+    # Looking for Data_Lenght
+    frame_size = rx_buffer[Data_Lenght_Position]
+    
+    # Verify if the entire frame is in the buffer + the checksum
+    end = start + frame_size + 1
+    if (rx_read_pos + available) < end:
+        return None
+    
+    frame = bytearray(frame_size + 1)
+    # Extract then entire frame
+    for j in range(frame_size + 1):
+        frame[j] = rx_buffer[(start + j) % RX_BUFFER_SIZE]
+    rx_read_pos = (start + j + 1) % RX_BUFFER_SIZE
+    start = None
+    return bytes(frame)
 
 def connect_and_subscribe():
   global client
@@ -105,13 +206,15 @@ def connect_and_subscribe():
   return client
 
 def sub_cb(topic, msg):
+  global current_poll_frame
   print((topic, msg))
   if topic == (MQTT_TOPICS["command"].encode()):
     led.off()
     print('Received command: %s' % msg)
-    input_cmd = ualdes.frame_encode(msg)
-    print(input_cmd)
-    if input_cmd != None:      
+    input_cmd = frame_encode(msg)
+    print('Encoded command: %s' % ' '.join(f'{b:02X}' for b in input_cmd))
+    if input_cmd != None:
+       current_poll_frame = bytearray(input_cmd)
        print(uart.write(bytearray(input_cmd)))
        utime.sleep(0.5)
     led.on()
@@ -121,11 +224,10 @@ client = None
 try_reconnect()
 
 last_ping = utime.time()
-ping_interval = 30  # Ping toutes les 30 secondes
-
 
 while True:
   # Vérification périodique de la connexion Wi-Fi
+  uart_data = None
   if not wlan.isconnected():
     print("Wi-Fi déconnecté. Tentative de reconnexion...")
     wlan.connect(WIFI_NETWORKS["ssid"], WIFI_NETWORKS["password"])
@@ -141,10 +243,17 @@ while True:
 
   try:
     client.check_msg()
-    uart_data = uart.read()
+    
+    if UALDES_OPTIONS["device"] == "T.Flow":
+        uart_data = uart.read()
+    elif UALDES_OPTIONS["device"] == "EASYHOME":
+        if (utime.time() - last_poll) > UALDES_OPTIONS["refresh_time"]:
+            uart.write(current_poll_frame)
+            last_poll = utime.time()
+        uart_to_buffer()
+        uart_data = extract_frame_from_buffer()
 
-
-    if (utime.time() - last_ping) > ping_interval:
+    if (utime.time() - last_ping) > MQTT_CONFIG["keepalive"]:
         try:
             client.ping()
             print("Ping envoyé")
@@ -153,19 +262,50 @@ while True:
             print("Erreur ping, tentative de reconnexion...")
             try_reconnect()
 
-    if (utime.time() - last_message) > UALDES_OPTIONS["refresh_time"]:
+    if UALDES_OPTIONS["device"] == "TFLOW":
+        if (utime.time() - last_message) > UALDES_OPTIONS["refresh_time"]:
+            if uart_data is not None:
+                print("Trame recue")
+                print(uart_data)
+                print("Taille : " + str(len(uart_data)))
+                try:
+                    led.off()
+                    client.publish(MQTT_TOPICS["main"]+"trame", bytearray(uart_data).hex(" "))
+                    decoded_data = frame_decode(uart_data)
+                    if decoded_data is not None:  # Check if data was decoded successfully
+                        for topic in decoded_data:
+                            client.publish(MQTT_TOPICS["main"]+topic, str(decoded_data[topic]))
+                            print(f"{MQTT_TOPICS['main']}{topic}: {decoded_data[topic]}")
+
+                    last_message = utime.time()
+                    utime.sleep(0.2)
+                    led.on()
+                except Exception as e:
+                    print("Error publishing data:", e)
+            
+    elif UALDES_OPTIONS["device"] == "EASYHOME":
         if uart_data is not None:
-            print("Trame recue")
-            print(uart_data)
+            print("Trame received at: ", utime.time())
+            print("Trame recue: " + ' '.join(f'{b:02X}' for b in uart_data))
             print("Taille : " + str(len(uart_data)))
             try:
                 led.off()
-                client.publish(MQTT_TOPICS["main"]+"trame", bytearray(uart_data).hex(" "))
-                decoded_data = ualdes.frame_decode(uart_data)
+                client.publish(MQTT_TOPICS["main"]+UALDES_OPTIONS["serial_number"]+"/trame_VMC", bytearray(uart_data).hex(" "))
+                decoded_data = frame_decode(uart_data)
                 if decoded_data is not None:  # Check if data was decoded successfully
-                    for topic in decoded_data:
-                        client.publish(MQTT_TOPICS["main"]+topic, str(decoded_data[topic]))
-                        print(f"{MQTT_TOPICS['main']}{topic}: {decoded_data[topic]}")
+                    for group, properties in MQTT_GROUPS.items():
+                        payload = "{"
+                        for topic, data in properties.items():
+                            # Add a comma in case it is not the first one
+                            if payload != "{":
+                                payload = payload+","
+                            payload = payload+"\""+topic+"\":"+str(decoded_data[data])+""
+                        payload = payload+"}"
+                        client.publish(MQTT_TOPICS["main"]+UALDES_OPTIONS["serial_number"]+"/"+group, payload)
+                    if UALDES_OPTIONS["device_in_ha"]:
+                        for sensor, info in MQTT_HA.items():
+                            payload = json.dumps(info["properties"])
+                            client.publish(MQTT_TOPICS["haPrefix"]+info["type"]+"/aldes/"+UALDES_OPTIONS["serial_number"]+"_"+str(sensor)+"/config", payload)
                 last_message = utime.time()
                 utime.sleep(0.2)
                 led.on()
